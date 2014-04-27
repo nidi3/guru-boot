@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>guru.nidi.boot</groupId>
+        <artifactId>guru-boot</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>delivery</artifactId>
+
+    <properties>
+        <remote.user>ec2-user</remote.user>
+        <remote.host>ec2-54-218-93-103.us-west-2.compute.amazonaws.com</remote.host>
+    </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>guru.nidi.maven.plugins</groupId>
+                    <artifactId>tools-maven-plugin</artifactId>
+                    <version>1.0.5</version>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>1.7</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.ant</groupId>
+                            <artifactId>ant-jsch</artifactId>
+                            <version>1.8.4</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.ant</groupId>
+                            <artifactId>ant-commons-net</artifactId>
+                            <version>1.8.4</version>
+                        </dependency>
+                    </dependencies>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>deploy-prod</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <phase>generate-resources</phase>
+                                <configuration>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>guru-boot-web</artifactId>
+                                            <version>${deliveryVersion}</version>
+                                            <type>war</type>
+                                            <destFileName>guru-boot.war</destFileName>
+                                        </artifactItem>
+                                    </artifactItems>
+                                    <outputDirectory>${project.build.directory}</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>guru.nidi.maven.plugins</groupId>
+                        <artifactId>tools-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>deploy-version</id>
+                                <goals>
+                                    <goal>consoleInput</goal>
+                                </goals>
+                                <phase>initialize</phase>
+                                <configuration>
+                                    <prompt>Version to deploy</prompt>
+                                    <targetProperty>deliveryVersion</targetProperty>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>install</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <scp keyfile="${basedir}/stni.pem"
+                                             trust="true" file="target/guru-boot.war"
+                                             remoteTofile="${remote.user}@${remote.host}:guru-boot.war"/>
+                                        <sshexec keyfile="${basedir}/stni.pem"
+                                                 trust="true" host="${remote.host}"
+                                                 username="${remote.user}"
+                                                 command="tomcat/bin/shutdown.sh; sleep 5s; rm -r tomcat/webapps/guru-boot; cp guru-boot.war tomcat/webapps; tomcat/bin/startup.sh"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
